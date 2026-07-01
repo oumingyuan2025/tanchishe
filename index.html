@@ -17,9 +17,9 @@
       <section class="hero">
         <p class="eyebrow">Desktop Arcade</p>
         <h1>3D 霓虹贪吃蛇</h1>
-        <p class="intro">用方向键或 WASD 操控立体小蛇，在真实 WebGL 3D 赛道里吃掉能量果实。</p>
+        <p class="intro">用方向键或 WASD 控制平面方向，用 Q/E 升降，在真实三维空间里追逐能量果实。</p>
         <div class="hero-badges" aria-label="游戏特色">
-          <span>真实 WebGL 3D</span>
+          <span>三维空间移动</span>
           <span>动态加速</span>
           <span>透视相机与光照</span>
         </div>
@@ -47,7 +47,7 @@
           <canvas id="game-board" width="600" height="600" aria-label="贪吃蛇游戏区域"></canvas>
           <div class="overlay" id="overlay">
             <h2 id="overlay-title">准备开始</h2>
-            <p id="overlay-message">按空格键或点击“开始游戏”进入真实 WebGL 3D 赛道。</p>
+            <p id="overlay-message">按空格键或点击“开始游戏”进入可上下穿梭的 3D 立方赛道。</p>
           </div>
         </div>
 
@@ -61,10 +61,11 @@
       <aside class="tips" aria-label="操作说明">
         <h2>操作说明</h2>
         <ul>
-          <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 控制方向</li>
+          <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 控制平面方向</li>
+          <li><kbd>Q</kbd> 上升一层，<kbd>E</kbd> 下降一层</li>
           <li><kbd>Space</kbd> 开始或暂停</li>
           <li><kbd>R</kbd> 重新开始</li>
-          <li>连续得分会逐步加速，撞墙或撞到自己则游戏结束</li>
+          <li>连续得分会逐步加速，撞到三维边界或蛇身则游戏结束</li>
         </ul>
         <div class="mini-panel">
           <span>目标</span>

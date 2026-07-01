@@ -15,14 +15,16 @@ const startButton = document.querySelector("#start-button");
 const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
 
-const gridSize = 24;
+const gridSize = 12;
+const levelCount = 8;
 const baseTickMs = 128;
 const minTickMs = 64;
 const bestScoreKey = "neon-snake-best-score";
 const boardOffset = gridSize / 2;
+const levelHeight = 1.05;
 const camera = {
-  position: [15, 18, 24],
-  target: [0, 0, 0],
+  position: [13.5, 10.5, 17],
+  target: [0, 3.2, 0],
 };
 
 let snake;
@@ -42,14 +44,16 @@ let attributes;
 let bestScore = Number(localStorage.getItem(bestScoreKey)) || 0;
 
 const directions = {
-  ArrowUp: { x: 0, y: -1 },
-  KeyW: { x: 0, y: -1 },
-  ArrowDown: { x: 0, y: 1 },
-  KeyS: { x: 0, y: 1 },
-  ArrowLeft: { x: -1, y: 0 },
-  KeyA: { x: -1, y: 0 },
-  ArrowRight: { x: 1, y: 0 },
-  KeyD: { x: 1, y: 0 },
+  ArrowUp: { x: 0, y: -1, z: 0 },
+  KeyW: { x: 0, y: -1, z: 0 },
+  ArrowDown: { x: 0, y: 1, z: 0 },
+  KeyS: { x: 0, y: 1, z: 0 },
+  ArrowLeft: { x: -1, y: 0, z: 0 },
+  KeyA: { x: -1, y: 0, z: 0 },
+  ArrowRight: { x: 1, y: 0, z: 0 },
+  KeyD: { x: 1, y: 0, z: 0 },
+  KeyQ: { x: 0, y: 0, z: 1 },
+  KeyE: { x: 0, y: 0, z: -1 },
 };
 
 if (!gl) {
@@ -132,11 +136,11 @@ function initWebGL() {
 
 function resetGame() {
   snake = [
-    { x: 11, y: 12 },
-    { x: 10, y: 12 },
-    { x: 9, y: 12 },
+    { x: 5, y: 6, z: 2 },
+    { x: 4, y: 6, z: 2 },
+    { x: 3, y: 6, z: 2 },
   ];
-  direction = { x: 1, y: 0 };
+  direction = { x: 1, y: 0, z: 0 };
   nextDirection = direction;
   score = 0;
   tickMs = baseTickMs;
@@ -146,7 +150,7 @@ function resetGame() {
   food = createFood();
   updateStats();
   setStatus("等待启动");
-  showOverlay("准备开始", "按空格键或点击“开始游戏”进入真实 WebGL 3D 赛道。");
+  showOverlay("准备开始", "按空格键或点击“开始游戏”进入可上下穿梭的 3D 立方赛道。");
   draw();
 }
 
@@ -160,7 +164,7 @@ function startGame() {
   }
 
   gameState = "playing";
-  setStatus("真实 3D 赛道运行中");
+  setStatus("三维空间赛道运行中");
   hideOverlay();
   lastFrameTime = performance.now();
   requestAnimationFrame(gameLoop);
@@ -173,7 +177,7 @@ function pauseGame() {
 
   gameState = "paused";
   setStatus("游戏已暂停");
-  showOverlay("已暂停", "按空格键或点击“开始游戏”继续真实 3D 挑战。");
+  showOverlay("已暂停", "按空格键或点击“开始游戏”继续三维空间挑战。");
 }
 
 function restartGame() {
@@ -202,8 +206,9 @@ function update() {
   const newHead = {
     x: head.x + direction.x,
     y: head.y + direction.y,
+    z: head.z + direction.z,
   };
-  const willEat = newHead.x === food.x && newHead.y === food.y;
+  const willEat = newHead.x === food.x && newHead.y === food.y && newHead.z === food.z;
 
   if (isWallCollision(newHead) || isSnakeCollision(newHead, willEat)) {
     endGame();
@@ -258,21 +263,25 @@ function drawSkyline() {
 }
 
 function drawBoard() {
-  drawMesh(cubeMesh, [0, -0.16, 0], [gridSize + 1.1, 0.2, gridSize + 1.1], [0.03, 0.14, 0.27], 0.08, 1);
-  drawMesh(cubeMesh, [0, -0.34, 0], [gridSize + 1.8, 0.18, gridSize + 1.8], [0.02, 0.06, 0.13], 0.04, 1);
+  drawMesh(cubeMesh, [0, -0.2, 0], [gridSize + 1.1, 0.18, gridSize + 1.1], [0.02, 0.08, 0.17], 0.05, 0.86);
 
-  for (let y = 0; y < gridSize; y += 1) {
-    for (let x = 0; x < gridSize; x += 1) {
-      const isAlt = (x + y) % 2 === 0;
-      const world = cellToWorld(x, y);
-      drawMesh(
-        cubeMesh,
-        [world[0], -0.02, world[2]],
-        [0.94, 0.05, 0.94],
-        isAlt ? [0.05, 0.23, 0.42] : [0.04, 0.18, 0.34],
-        isAlt ? 0.07 : 0.04,
-        1,
-      );
+  for (let z = 0; z < levelCount; z += 1) {
+    const levelY = z * levelHeight;
+    const levelAlpha = z === 0 ? 0.22 : 0.1;
+
+    drawMesh(cubeMesh, [0, levelY, 0], [gridSize + 0.2, 0.025, gridSize + 0.2], [0.03, 0.2, 0.38], 0.08, levelAlpha);
+
+    for (let i = 0; i < gridSize; i += 1) {
+      const offset = i - boardOffset + 0.5;
+      drawMesh(cubeMesh, [offset, levelY + 0.02, 0], [0.018, 0.018, gridSize], [0.08, 0.9, 1.0], 0.32, 0.18);
+      drawMesh(cubeMesh, [0, levelY + 0.021, offset], [gridSize, 0.018, 0.018], [0.08, 0.9, 1.0], 0.32, 0.18);
+    }
+  }
+
+  for (let x = 0; x <= gridSize; x += gridSize) {
+    for (let y = 0; y <= gridSize; y += gridSize) {
+      const world = cellToWorld(x - 0.5, y - 0.5, (levelCount - 1) / 2);
+      drawMesh(cubeMesh, [world[0], (levelCount - 1) * levelHeight / 2, world[2]], [0.12, levelCount * levelHeight, 0.12], [0.08, 0.9, 1.0], 0.42, 0.7);
     }
   }
 
@@ -281,18 +290,24 @@ function drawBoard() {
   drawMesh(cubeMesh, [0, 0.24, boardOffset + 0.38], [gridSize + 0.8, 0.22, 0.18], rimColor, 0.35, 0.92);
   drawMesh(cubeMesh, [-boardOffset - 0.38, 0.24, 0], [0.18, 0.22, gridSize + 0.8], rimColor, 0.35, 0.92);
   drawMesh(cubeMesh, [boardOffset + 0.38, 0.24, 0], [0.18, 0.22, gridSize + 0.8], rimColor, 0.35, 0.92);
+
+  const topY = (levelCount - 1) * levelHeight + 0.08;
+  drawMesh(cubeMesh, [0, topY, -boardOffset - 0.38], [gridSize + 0.8, 0.14, 0.15], rimColor, 0.42, 0.72);
+  drawMesh(cubeMesh, [0, topY, boardOffset + 0.38], [gridSize + 0.8, 0.14, 0.15], rimColor, 0.42, 0.72);
+  drawMesh(cubeMesh, [-boardOffset - 0.38, topY, 0], [0.15, 0.14, gridSize + 0.8], rimColor, 0.42, 0.72);
+  drawMesh(cubeMesh, [boardOffset + 0.38, topY, 0], [0.15, 0.14, gridSize + 0.8], rimColor, 0.42, 0.72);
 }
 
 function drawSnake() {
   snake.forEach((segment, index) => {
-    const world = cellToWorld(segment.x, segment.y);
+    const world = cellToWorld(segment.x, segment.y, segment.z);
     const isHead = index === 0;
     const bodyPulse = Math.sin(performance.now() / 170 + index * 0.42) * 0.03;
     const size = isHead ? 0.92 : 0.82 + bodyPulse;
 
     drawMesh(
       cubeMesh,
-      [world[0], 0.47, world[2]],
+      [world[0], world[1] + 0.44, world[2]],
       [size, isHead ? 0.96 : 0.82, size],
       isHead ? [0.83, 1.0, 0.22] : [0.05, 0.82, 1.0],
       isHead ? 0.45 : 0.23,
@@ -306,11 +321,11 @@ function drawSnake() {
 }
 
 function drawSnakeEyes(headWorld) {
-  const forward = normalize3([direction.x, 0, direction.y]);
+  const forward = normalize3([direction.x, direction.z, direction.y]);
   const side = normalize3([-forward[2], 0, forward[0]]);
   const eyeBase = [
     headWorld[0] + forward[0] * 0.43,
-    0.72,
+    headWorld[1] + 0.68 + forward[1] * 0.36,
     headWorld[2] + forward[2] * 0.43,
   ];
 
@@ -332,12 +347,12 @@ function drawSnakeEyes(headWorld) {
 
 function drawFood() {
   const pulse = Math.sin(performance.now() / 150);
-  const world = cellToWorld(food.x, food.y);
+  const world = cellToWorld(food.x, food.y, food.z);
 
-  drawMesh(cubeMesh, [world[0], 0.025, world[2]], [0.78, 0.035, 0.78], [1, 0.24, 0.83], 0.36, 0.34);
+  drawMesh(cubeMesh, [world[0], world[1] + 0.025, world[2]], [0.78, 0.035, 0.78], [1, 0.24, 0.83], 0.36, 0.34);
   drawMesh(
     sphereMesh,
-    [world[0], 1.18 + pulse * 0.16, world[2]],
+    [world[0], world[1] + 0.86 + pulse * 0.16, world[2]],
     [0.38 + pulse * 0.04, 0.38 + pulse * 0.04, 0.38 + pulse * 0.04],
     [1.0, 0.55, 0.12],
     0.72,
@@ -352,10 +367,11 @@ function burstParticles(origin) {
     particles.push({
       x: origin.x + 0.5,
       y: origin.y + 0.5,
-      z: 1.2,
+      z: origin.z,
+      height: 0.86,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      vz: 0.09 + Math.random() * 0.08,
+      vh: 0.09 + Math.random() * 0.08,
       life: 34 + Math.random() * 18,
       color: i % 2 === 0 ? [1.0, 0.78, 0.18] : [1.0, 0.24, 0.83],
     });
@@ -368,10 +384,10 @@ function updateParticles() {
       ...particle,
       x: particle.x + particle.vx,
       y: particle.y + particle.vy,
-      z: particle.z + particle.vz,
+      height: particle.height + particle.vh,
       vx: particle.vx * 0.94,
       vy: particle.vy * 0.94,
-      vz: particle.vz * 0.91 - 0.006,
+      vh: particle.vh * 0.91 - 0.006,
       life: particle.life - 1,
     }))
     .filter((particle) => particle.life > 0);
@@ -379,11 +395,11 @@ function updateParticles() {
 
 function drawParticles() {
   particles.forEach((particle) => {
-    const world = cellToWorld(particle.x - 0.5, particle.y - 0.5);
+    const world = cellToWorld(particle.x - 0.5, particle.y - 0.5, particle.z);
     const alpha = Math.max(0, particle.life / 52);
     drawMesh(
       sphereMesh,
-      [world[0], particle.z, world[2]],
+      [world[0], world[1] + particle.height, world[2]],
       [0.09, 0.09, 0.09],
       particle.color,
       0.86,
@@ -415,10 +431,12 @@ function drawMesh(mesh, position, scale, color, emissive = 0, alpha = 1) {
 function createFood() {
   const openCells = [];
 
-  for (let y = 0; y < gridSize; y += 1) {
-    for (let x = 0; x < gridSize; x += 1) {
-      if (!snake.some((segment) => segment.x === x && segment.y === y)) {
-        openCells.push({ x, y });
+  for (let z = 0; z < levelCount; z += 1) {
+    for (let y = 0; y < gridSize; y += 1) {
+      for (let x = 0; x < gridSize; x += 1) {
+        if (!snake.some((segment) => segment.x === x && segment.y === y && segment.z === z)) {
+          openCells.push({ x, y, z });
+        }
       }
     }
   }
@@ -427,16 +445,26 @@ function createFood() {
 }
 
 function isWallCollision(position) {
-  return position.x < 0 || position.x >= gridSize || position.y < 0 || position.y >= gridSize;
+  return (
+    position.x < 0 ||
+    position.x >= gridSize ||
+    position.y < 0 ||
+    position.y >= gridSize ||
+    position.z < 0 ||
+    position.z >= levelCount
+  );
 }
 
 function isSnakeCollision(position, willEat) {
   const bodyToCheck = willEat ? snake : snake.slice(0, -1);
-  return bodyToCheck.some((segment) => segment.x === position.x && segment.y === position.y);
+  return bodyToCheck.some((segment) => segment.x === position.x && segment.y === position.y && segment.z === position.z);
 }
 
 function setDirection(newDirection) {
-  const isOpposite = newDirection.x + direction.x === 0 && newDirection.y + direction.y === 0;
+  const isOpposite =
+    newDirection.x + direction.x === 0 &&
+    newDirection.y + direction.y === 0 &&
+    newDirection.z + direction.z === 0;
   if (!isOpposite) {
     nextDirection = newDirection;
   }
@@ -449,7 +477,7 @@ function endGame() {
     localStorage.setItem(bestScoreKey, String(bestScore));
   }
   updateStats();
-  setStatus("真实 3D 赛道熄火");
+  setStatus("三维空间赛道熄火");
   draw();
   showOverlay("游戏结束", `本局得分 ${score}，按 R 或点击“重新开始”再来一局。`);
 }
@@ -474,8 +502,8 @@ function hideOverlay() {
   overlay.classList.add("is-hidden");
 }
 
-function cellToWorld(x, y) {
-  return [x - boardOffset + 0.5, 0, y - boardOffset + 0.5];
+function cellToWorld(x, y, z = 0) {
+  return [x - boardOffset + 0.5, z * levelHeight, y - boardOffset + 0.5];
 }
 
 function createProgram(vertexSource, fragmentSource) {
