@@ -7,6 +7,8 @@ const gl = canvas.getContext("webgl", {
 const scoreEl = document.querySelector("#score");
 const bestScoreEl = document.querySelector("#best-score");
 const speedEl = document.querySelector("#speed");
+const heightLevelEl = document.querySelector("#height-level");
+const targetLevelEl = document.querySelector("#target-level");
 const statusEl = document.querySelector("#game-status");
 const overlay = document.querySelector("#overlay");
 const overlayTitle = document.querySelector("#overlay-title");
@@ -222,10 +224,10 @@ function update() {
     tickMs = Math.max(minTickMs, baseTickMs - Math.floor(score / 50) * 7);
     burstParticles(food);
     food = createFood();
-    updateStats();
   } else {
     snake.pop();
   }
+  updateStats();
 }
 
 function draw() {
@@ -239,15 +241,23 @@ function draw() {
 
   const aspect = canvas.width / canvas.height;
   const projection = mat4Perspective((42 * Math.PI) / 180, aspect, 0.1, 100);
-  const view = mat4LookAt(camera.position, camera.target, [0, 1, 0]);
+  const time = performance.now() / 1000;
+  const orbitRadius = 21;
+  const cameraPosition = [
+    Math.sin(time * 0.16) * orbitRadius,
+    10.5 + Math.sin(time * 0.09) * 1.2,
+    Math.cos(time * 0.16) * orbitRadius,
+  ];
+  const view = mat4LookAt(cameraPosition, camera.target, [0, 1, 0]);
   const viewProjection = mat4Multiply(projection, view);
 
   gl.uniformMatrix4fv(uniforms.viewProjection, false, viewProjection);
   gl.uniform3fv(uniforms.lightDirection, normalize3([0.35, 0.9, 0.48]));
-  gl.uniform3fv(uniforms.cameraPosition, camera.position);
+  gl.uniform3fv(uniforms.cameraPosition, cameraPosition);
 
   drawSkyline();
   drawBoard();
+  drawAltitudeGuides();
   drawFood();
   drawSnake();
   drawParticles();
@@ -263,25 +273,33 @@ function drawSkyline() {
 }
 
 function drawBoard() {
-  drawMesh(cubeMesh, [0, -0.2, 0], [gridSize + 1.1, 0.18, gridSize + 1.1], [0.02, 0.08, 0.17], 0.05, 0.86);
+  drawMesh(cubeMesh, [0, -0.22, 0], [gridSize + 1.1, 0.12, gridSize + 1.1], [0.02, 0.08, 0.17], 0.05, 0.38);
 
   for (let z = 0; z < levelCount; z += 1) {
     const levelY = z * levelHeight;
-    const levelAlpha = z === 0 ? 0.22 : 0.1;
+    const levelAlpha = z === snake[0].z || z === food.z ? 0.16 : 0.045;
 
-    drawMesh(cubeMesh, [0, levelY, 0], [gridSize + 0.2, 0.025, gridSize + 0.2], [0.03, 0.2, 0.38], 0.08, levelAlpha);
+    drawMesh(cubeMesh, [0, levelY, 0], [gridSize + 0.2, 0.018, gridSize + 0.2], [0.03, 0.2, 0.38], 0.08, levelAlpha);
 
-    for (let i = 0; i < gridSize; i += 1) {
+    for (let i = 0; i < gridSize; i += 2) {
       const offset = i - boardOffset + 0.5;
-      drawMesh(cubeMesh, [offset, levelY + 0.02, 0], [0.018, 0.018, gridSize], [0.08, 0.9, 1.0], 0.32, 0.18);
-      drawMesh(cubeMesh, [0, levelY + 0.021, offset], [gridSize, 0.018, 0.018], [0.08, 0.9, 1.0], 0.32, 0.18);
+      drawMesh(cubeMesh, [offset, levelY + 0.02, 0], [0.014, 0.014, gridSize], [0.08, 0.9, 1.0], 0.32, 0.14);
+      drawMesh(cubeMesh, [0, levelY + 0.021, offset], [gridSize, 0.014, 0.014], [0.08, 0.9, 1.0], 0.32, 0.14);
     }
   }
 
-  for (let x = 0; x <= gridSize; x += gridSize) {
-    for (let y = 0; y <= gridSize; y += gridSize) {
+  for (let x = 0; x <= gridSize; x += 3) {
+    for (let y = 0; y <= gridSize; y += 3) {
       const world = cellToWorld(x - 0.5, y - 0.5, (levelCount - 1) / 2);
-      drawMesh(cubeMesh, [world[0], (levelCount - 1) * levelHeight / 2, world[2]], [0.12, levelCount * levelHeight, 0.12], [0.08, 0.9, 1.0], 0.42, 0.7);
+      const isCorner = (x === 0 || x === gridSize) && (y === 0 || y === gridSize);
+      drawMesh(
+        cubeMesh,
+        [world[0], (levelCount - 1) * levelHeight / 2, world[2]],
+        [isCorner ? 0.14 : 0.045, levelCount * levelHeight, isCorner ? 0.14 : 0.045],
+        [0.08, 0.9, 1.0],
+        isCorner ? 0.45 : 0.28,
+        isCorner ? 0.72 : 0.25,
+      );
     }
   }
 
@@ -296,6 +314,31 @@ function drawBoard() {
   drawMesh(cubeMesh, [0, topY, boardOffset + 0.38], [gridSize + 0.8, 0.14, 0.15], rimColor, 0.42, 0.72);
   drawMesh(cubeMesh, [-boardOffset - 0.38, topY, 0], [0.15, 0.14, gridSize + 0.8], rimColor, 0.42, 0.72);
   drawMesh(cubeMesh, [boardOffset + 0.38, topY, 0], [0.15, 0.14, gridSize + 0.8], rimColor, 0.42, 0.72);
+}
+
+function drawAltitudeGuides() {
+  const head = snake[0];
+  const headWorld = cellToWorld(head.x, head.y, head.z);
+  const foodWorld = cellToWorld(food.x, food.y, food.z);
+
+  drawVerticalBeacon(headWorld, head.z, [0.35, 1.0, 0.42], 0.5);
+  drawVerticalBeacon(foodWorld, food.z, [1.0, 0.24, 0.83], 0.64);
+  drawLevelHalo(head.z, [0.35, 1.0, 0.42], 0.14);
+  drawLevelHalo(food.z, [1.0, 0.24, 0.83], 0.13);
+}
+
+function drawVerticalBeacon(world, level, color, emissive) {
+  const height = level * levelHeight + 0.92;
+  drawMesh(cubeMesh, [world[0], height / 2, world[2]], [0.08, height, 0.08], color, emissive, 0.52);
+  drawMesh(cubeMesh, [world[0], level * levelHeight + 0.03, world[2]], [0.86, 0.04, 0.86], color, emissive, 0.22);
+}
+
+function drawLevelHalo(level, color, alpha) {
+  const y = level * levelHeight + 0.05;
+  drawMesh(cubeMesh, [0, y, -boardOffset - 0.18], [gridSize + 0.35, 0.07, 0.08], color, 0.36, alpha);
+  drawMesh(cubeMesh, [0, y, boardOffset + 0.18], [gridSize + 0.35, 0.07, 0.08], color, 0.36, alpha);
+  drawMesh(cubeMesh, [-boardOffset - 0.18, y, 0], [0.08, 0.07, gridSize + 0.35], color, 0.36, alpha);
+  drawMesh(cubeMesh, [boardOffset + 0.18, y, 0], [0.08, 0.07, gridSize + 0.35], color, 0.36, alpha);
 }
 
 function drawSnake() {
@@ -486,6 +529,8 @@ function updateStats() {
   scoreEl.textContent = score;
   bestScoreEl.textContent = bestScore;
   speedEl.textContent = `${(baseTickMs / tickMs).toFixed(1)}x`;
+  heightLevelEl.textContent = snake ? `${snake[0].z + 1}/${levelCount}` : `--/${levelCount}`;
+  targetLevelEl.textContent = food ? `${food.z + 1}/${levelCount}` : "--";
 }
 
 function setStatus(text) {
