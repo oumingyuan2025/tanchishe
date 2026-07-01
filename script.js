@@ -106,15 +106,16 @@ function update() {
     x: head.x + direction.x,
     y: head.y + direction.y,
   };
+  const willEat = newHead.x === food.x && newHead.y === food.y;
 
-  if (isWallCollision(newHead) || isSnakeCollision(newHead)) {
+  if (isWallCollision(newHead) || isSnakeCollision(newHead, willEat)) {
     endGame();
     return;
   }
 
   snake.unshift(newHead);
 
-  if (newHead.x === food.x && newHead.y === food.y) {
+  if (willEat) {
     score += 10;
     tickMs = Math.max(minTickMs, baseTickMs - Math.floor(score / 50) * 7);
     food = createFood();
@@ -207,8 +208,9 @@ function isWallCollision(position) {
   return position.x < 0 || position.x >= gridSize || position.y < 0 || position.y >= gridSize;
 }
 
-function isSnakeCollision(position) {
-  return snake.some((segment) => segment.x === position.x && segment.y === position.y);
+function isSnakeCollision(position, willEat) {
+  const bodyToCheck = willEat ? snake : snake.slice(0, -1);
+  return bodyToCheck.some((segment) => segment.x === position.x && segment.y === position.y);
 }
 
 function setDirection(newDirection) {
