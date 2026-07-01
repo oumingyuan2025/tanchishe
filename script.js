@@ -13,10 +13,16 @@ const pauseButton = document.querySelector("#pause-button");
 const restartButton = document.querySelector("#restart-button");
 
 const gridSize = 24;
-const tileSize = canvas.width / gridSize;
 const baseTickMs = 128;
 const minTickMs = 64;
 const bestScoreKey = "neon-snake-best-score";
+const iso = {
+  originX: canvas.width / 2,
+  originY: 80,
+  halfW: 12,
+  halfH: 7,
+  cubeH: 15,
+};
 
 let snake;
 let food;
@@ -56,7 +62,7 @@ function resetGame() {
   food = createFood();
   updateStats();
   setStatus("等待启动");
-  showOverlay("准备开始", "按空格键或点击“开始游戏”进入霓虹赛道。");
+  showOverlay("准备开始", "按空格键或点击“开始游戏”进入 3D 霓虹赛道。");
   draw();
 }
 
@@ -70,7 +76,7 @@ function startGame() {
   }
 
   gameState = "playing";
-  setStatus("能量赛道运行中");
+  setStatus("3D 赛道运行中");
   hideOverlay();
   lastFrameTime = performance.now();
   requestAnimationFrame(gameLoop);
@@ -83,7 +89,7 @@ function pauseGame() {
 
   gameState = "paused";
   setStatus("游戏已暂停");
-  showOverlay("已暂停", "按空格键或点击“开始游戏”继续挑战。");
+  showOverlay("已暂停", "按空格键或点击“开始游戏”继续 3D 挑战。");
 }
 
 function restartGame() {
@@ -98,11 +104,11 @@ function gameLoop(timestamp) {
 
   if (timestamp - lastFrameTime >= tickMs) {
     update();
-    updateParticles();
-    draw();
     lastFrameTime = timestamp;
   }
 
+  updateParticles();
+  draw();
   requestAnimationFrame(gameLoop);
 }
 
@@ -156,109 +162,114 @@ function drawGrid() {
 
   ctx.fillStyle = boardGradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawHorizon();
+  drawBoardShadow();
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.035)";
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= gridSize; i += 1) {
-    const position = i * tileSize;
-    ctx.beginPath();
-    ctx.moveTo(position, 0);
-    ctx.lineTo(position, canvas.height);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, position);
-    ctx.lineTo(canvas.width, position);
-    ctx.stroke();
+  for (let depth = 0; depth <= (gridSize - 1) * 2; depth += 1) {
+    for (let y = 0; y < gridSize; y += 1) {
+      const x = depth - y;
+      if (x >= 0 && x < gridSize) {
+        drawFloorTile(x, y);
+      }
+    }
   }
 
-  ctx.strokeStyle = "rgba(49, 232, 255, 0.12)";
-  ctx.lineWidth = 5;
-  ctx.strokeRect(2.5, 2.5, canvas.width - 5, canvas.height - 5);
+  drawBoardRim();
 }
 
 function drawSnake() {
-  snake.forEach((segment, index) => {
-    const inset = index === 0 ? 2 : 3;
-    const x = segment.x * tileSize + inset;
-    const y = segment.y * tileSize + inset;
-    const size = tileSize - inset * 2;
-    const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
+  [...snake]
+    .map((segment, index) => ({ segment, index }))
+    .sort((a, b) => a.segment.x + a.segment.y - (b.segment.x + b.segment.y))
+    .forEach(({ segment, index }) => {
+      const isHead = index === 0;
+      drawPrism(segment.x, segment.y, {
+        height: isHead ? 23 : 18,
+        top: isHead ? "#f4ff78" : "#31e8ff",
+        left: isHead ? "#41d676" : "#168ee8",
+        right: isHead ? "#20a85d" : "#5a45dd",
+        stroke: isHead ? "rgba(244, 255, 120, 0.9)" : "rgba(49, 232, 255, 0.55)",
+        glow: isHead ? "rgba(101, 255, 159, 0.72)" : "rgba(49, 232, 255, 0.38)",
+      });
 
-    gradient.addColorStop(0, index === 0 ? "#f4ff78" : "#31e8ff");
-    gradient.addColorStop(1, index === 0 ? "#65ff9f" : "#7c5cff");
-
-    ctx.shadowColor = index === 0 ? "rgba(101, 255, 159, 0.9)" : "rgba(49, 232, 255, 0.5)";
-    ctx.shadowBlur = index === 0 ? 18 : 10;
-    ctx.fillStyle = gradient;
-    roundRect(x, y, size, size, 8);
-    ctx.fill();
-
-    if (index === 0) {
-      drawSnakeEyes(segment);
-    }
-  });
+      if (isHead) {
+        drawSnakeEyes(segment);
+      }
+    });
   ctx.shadowBlur = 0;
 }
 
 function drawFood() {
-  const centerX = food.x * tileSize + tileSize / 2;
-  const centerY = food.y * tileSize + tileSize / 2;
-  const pulse = Math.sin(performance.now() / 150) * 0.08;
-  const radius = tileSize * (0.36 + pulse);
-  const gradient = ctx.createRadialGradient(centerX, centerY, 2, centerX, centerY, radius);
+  const pulse = Math.sin(performance.now() / 150);
+  const center = projectCell(food.x + 0.5, food.y + 0.5, 34 + pulse * 4);
+  const shadow = projectCell(food.x + 0.5, food.y + 0.5, 1);
+  const radius = 9 + pulse * 1.2;
+  const gradient = ctx.createRadialGradient(center.x - 3, center.y - 4, 2, center.x, center.y, radius);
+
+  ctx.save();
+  ctx.globalAlpha = 0.42;
+  ctx.fillStyle = "rgba(255, 91, 209, 0.45)";
+  drawDiamondPath(shadow.x, shadow.y, iso.halfW * 0.82, iso.halfH * 0.82);
+  ctx.fill();
+  ctx.restore();
 
   gradient.addColorStop(0, "#fff7bd");
   gradient.addColorStop(0.45, "#ffcf5a");
   gradient.addColorStop(1, "#ff5bd1");
 
-  ctx.shadowColor = "rgba(255, 91, 209, 0.9)";
-  ctx.shadowBlur = 22;
+  ctx.shadowColor = "rgba(255, 91, 209, 0.95)";
+  ctx.shadowBlur = 28;
   ctx.fillStyle = gradient;
   ctx.beginPath();
-  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.58)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.64)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(centerX, centerY, radius + 5, 0, Math.PI * 2);
+  ctx.ellipse(center.x, center.y, radius + 8, radius * 0.48, Math.PI / 7, 0, Math.PI * 2);
   ctx.stroke();
   ctx.shadowBlur = 0;
 }
 
 function drawSnakeEyes(head) {
-  const centerX = head.x * tileSize + tileSize / 2;
-  const centerY = head.y * tileSize + tileSize / 2;
-  const eyeOffsetX = direction.y !== 0 ? 6 : 0;
-  const eyeOffsetY = direction.x !== 0 ? 6 : 0;
-  const forwardX = direction.x * 5;
-  const forwardY = direction.y * 5;
+  const center = projectCell(head.x + 0.5, head.y + 0.5, 27);
+  const forwardTarget = projectCell(head.x + 0.5 + direction.x, head.y + 0.5 + direction.y, 27);
+  const forward = normalizeVector({ x: forwardTarget.x - center.x, y: forwardTarget.y - center.y });
+  const side = { x: -forward.y, y: forward.x };
+  const eyeDistance = 4.4;
+  const eyeForward = 5.8;
 
   ctx.fillStyle = "#06111f";
   ctx.shadowBlur = 0;
   [
-    { x: centerX + eyeOffsetX + forwardX, y: centerY + eyeOffsetY + forwardY },
-    { x: centerX - eyeOffsetX + forwardX, y: centerY - eyeOffsetY + forwardY },
+    {
+      x: center.x + side.x * eyeDistance + forward.x * eyeForward,
+      y: center.y + side.y * eyeDistance + forward.y * eyeForward,
+    },
+    {
+      x: center.x - side.x * eyeDistance + forward.x * eyeForward,
+      y: center.y - side.y * eyeDistance + forward.y * eyeForward,
+    },
   ].forEach((eye) => {
     ctx.beginPath();
-    ctx.arc(eye.x, eye.y, 3.2, 0, Math.PI * 2);
+    ctx.arc(eye.x, eye.y, 2.7, 0, Math.PI * 2);
     ctx.fill();
   });
 }
 
 function burstParticles(origin) {
-  const centerX = origin.x * tileSize + tileSize / 2;
-  const centerY = origin.y * tileSize + tileSize / 2;
-
-  for (let i = 0; i < 24; i += 1) {
-    const angle = (Math.PI * 2 * i) / 24;
-    const speed = 2.2 + Math.random() * 2.8;
+  for (let i = 0; i < 30; i += 1) {
+    const angle = (Math.PI * 2 * i) / 30;
+    const speed = 0.12 + Math.random() * 0.16;
     particles.push({
-      x: centerX,
-      y: centerY,
+      x: origin.x + 0.5,
+      y: origin.y + 0.5,
+      z: 34,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      life: 28 + Math.random() * 16,
+      vz: 1.5 + Math.random() * 2.8,
+      life: 30 + Math.random() * 18,
       color: i % 2 === 0 ? "#ffcf5a" : "#ff5bd1",
     });
   }
@@ -270,8 +281,10 @@ function updateParticles() {
       ...particle,
       x: particle.x + particle.vx,
       y: particle.y + particle.vy,
+      z: particle.z + particle.vz,
       vx: particle.vx * 0.94,
       vy: particle.vy * 0.94,
+      vz: particle.vz * 0.9 - 0.22,
       life: particle.life - 1,
     }))
     .filter((particle) => particle.life > 0);
@@ -279,17 +292,195 @@ function updateParticles() {
 
 function drawParticles() {
   particles.forEach((particle) => {
-    const alpha = Math.max(0, particle.life / 42);
+    const point = projectCell(particle.x, particle.y, particle.z);
+    const alpha = Math.max(0, particle.life / 48);
     ctx.globalAlpha = alpha;
     ctx.fillStyle = particle.color;
     ctx.shadowColor = particle.color;
     ctx.shadowBlur = 18;
     ctx.beginPath();
-    ctx.arc(particle.x, particle.y, 3.5, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, 3.5, 0, Math.PI * 2);
     ctx.fill();
   });
   ctx.globalAlpha = 1;
   ctx.shadowBlur = 0;
+}
+
+function drawHorizon() {
+  ctx.save();
+  ctx.globalAlpha = 0.34;
+  ctx.strokeStyle = "rgba(49, 232, 255, 0.18)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 8; i += 1) {
+    const y = 48 + i * 34;
+    ctx.beginPath();
+    ctx.moveTo(30, y);
+    ctx.lineTo(canvas.width - 30, y + i * 7);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBoardShadow() {
+  const north = projectCell(0, 0, 0);
+  const east = projectCell(gridSize, 0, 0);
+  const south = projectCell(gridSize, gridSize, 0);
+  const west = projectCell(0, gridSize, 0);
+  const shadow = ctx.createLinearGradient(north.x, north.y, south.x, south.y + 80);
+
+  shadow.addColorStop(0, "rgba(49, 232, 255, 0.2)");
+  shadow.addColorStop(1, "rgba(255, 91, 209, 0.1)");
+  ctx.fillStyle = shadow;
+  ctx.shadowColor = "rgba(49, 232, 255, 0.34)";
+  ctx.shadowBlur = 34;
+  ctx.beginPath();
+  ctx.moveTo(north.x, north.y + 8);
+  ctx.lineTo(east.x + 8, east.y + 8);
+  ctx.lineTo(south.x, south.y + 54);
+  ctx.lineTo(west.x - 8, west.y + 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function drawFloorTile(x, y) {
+  const center = projectCell(x + 0.5, y + 0.5, 0);
+  const gradient = ctx.createLinearGradient(center.x, center.y - 10, center.x, center.y + 16);
+  const isAlt = (x + y) % 2 === 0;
+
+  gradient.addColorStop(0, isAlt ? "#13355f" : "#102d52");
+  gradient.addColorStop(1, isAlt ? "#071b35" : "#06172e");
+  ctx.fillStyle = gradient;
+  ctx.strokeStyle = "rgba(130, 232, 255, 0.11)";
+  ctx.lineWidth = 1;
+  drawDiamondPath(center.x, center.y, iso.halfW - 0.7, iso.halfH - 0.4);
+  ctx.fill();
+  ctx.stroke();
+
+  if (x === gridSize - 1 || y === gridSize - 1) {
+    drawTileSide(center, x === gridSize - 1, y === gridSize - 1);
+  }
+}
+
+function drawTileSide(center, drawRight, drawLeft) {
+  if (drawRight) {
+    ctx.fillStyle = "rgba(33, 102, 161, 0.52)";
+    ctx.beginPath();
+    ctx.moveTo(center.x + iso.halfW, center.y);
+    ctx.lineTo(center.x, center.y + iso.halfH);
+    ctx.lineTo(center.x, center.y + iso.halfH + 13);
+    ctx.lineTo(center.x + iso.halfW, center.y + 13);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  if (drawLeft) {
+    ctx.fillStyle = "rgba(10, 51, 104, 0.58)";
+    ctx.beginPath();
+    ctx.moveTo(center.x - iso.halfW, center.y);
+    ctx.lineTo(center.x, center.y + iso.halfH);
+    ctx.lineTo(center.x, center.y + iso.halfH + 13);
+    ctx.lineTo(center.x - iso.halfW, center.y + 13);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawBoardRim() {
+  const north = projectCell(0, 0, 1);
+  const east = projectCell(gridSize, 0, 1);
+  const south = projectCell(gridSize, gridSize, 1);
+  const west = projectCell(0, gridSize, 1);
+
+  ctx.strokeStyle = "rgba(49, 232, 255, 0.42)";
+  ctx.lineWidth = 3;
+  ctx.shadowColor = "rgba(49, 232, 255, 0.55)";
+  ctx.shadowBlur = 16;
+  ctx.beginPath();
+  ctx.moveTo(north.x, north.y);
+  ctx.lineTo(east.x, east.y);
+  ctx.lineTo(south.x, south.y);
+  ctx.lineTo(west.x, west.y);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawPrism(x, y, palette) {
+  const top = projectCell(x + 0.5, y + 0.5, palette.height);
+  const bottomOffset = iso.cubeH;
+  const left = { x: top.x - iso.halfW + 1, y: top.y };
+  const right = { x: top.x + iso.halfW - 1, y: top.y };
+  const front = { x: top.x, y: top.y + iso.halfH - 1 };
+  const back = { x: top.x, y: top.y - iso.halfH + 1 };
+
+  ctx.shadowColor = palette.glow;
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+  drawDiamondPath(top.x, top.y + bottomOffset + 5, iso.halfW * 0.9, iso.halfH * 0.78);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = palette.left;
+  ctx.beginPath();
+  ctx.moveTo(left.x, left.y);
+  ctx.lineTo(front.x, front.y);
+  ctx.lineTo(front.x, front.y + bottomOffset);
+  ctx.lineTo(left.x, left.y + bottomOffset);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = palette.right;
+  ctx.beginPath();
+  ctx.moveTo(right.x, right.y);
+  ctx.lineTo(front.x, front.y);
+  ctx.lineTo(front.x, front.y + bottomOffset);
+  ctx.lineTo(right.x, right.y + bottomOffset);
+  ctx.closePath();
+  ctx.fill();
+
+  const topGradient = ctx.createLinearGradient(back.x, back.y, front.x, front.y);
+  topGradient.addColorStop(0, "#ffffff");
+  topGradient.addColorStop(0.12, palette.top);
+  topGradient.addColorStop(1, palette.right);
+  ctx.fillStyle = topGradient;
+  ctx.strokeStyle = palette.stroke;
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = palette.glow;
+  ctx.shadowBlur = 16;
+  ctx.beginPath();
+  ctx.moveTo(back.x, back.y);
+  ctx.lineTo(right.x, right.y);
+  ctx.lineTo(front.x, front.y);
+  ctx.lineTo(left.x, left.y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function projectCell(x, y, z = 0) {
+  return {
+    x: iso.originX + (x - y) * iso.halfW,
+    y: iso.originY + (x + y) * iso.halfH - z,
+  };
+}
+
+function drawDiamondPath(x, y, halfW, halfH) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - halfH);
+  ctx.lineTo(x + halfW, y);
+  ctx.lineTo(x, y + halfH);
+  ctx.lineTo(x - halfW, y);
+  ctx.closePath();
+}
+
+function normalizeVector(vector) {
+  const length = Math.hypot(vector.x, vector.y) || 1;
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+  };
 }
 
 function createFood() {
