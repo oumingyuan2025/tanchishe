@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>霓虹贪吃蛇</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="game-shell">
+      <section class="hero">
+        <p class="eyebrow">Desktop Arcade</p>
+        <h1>霓虹贪吃蛇</h1>
+        <p class="intro">用方向键或 WASD 操控小蛇，吃掉能量果实，挑战更高分。</p>
+      </section>
+
+      <section class="game-card" aria-label="贪吃蛇游戏">
+        <div class="scoreboard">
+          <div>
+            <span>当前分数</span>
+            <strong id="score">0</strong>
+          </div>
+          <div>
+            <span>最高分</span>
+            <strong id="best-score">0</strong>
+          </div>
+          <div>
+            <span>速度</span>
+            <strong id="speed">1x</strong>
+          </div>
+        </div>
+
+        <div class="board-wrap">
+          <canvas id="game-board" width="600" height="600" aria-label="贪吃蛇游戏区域"></canvas>
+          <div class="overlay" id="overlay">
+            <h2 id="overlay-title">准备开始</h2>
+            <p id="overlay-message">按空格键或点击“开始游戏”进入霓虹赛道。</p>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="start-button" type="button">开始游戏</button>
+          <button id="pause-button" type="button">暂停</button>
+          <button id="restart-button" type="button">重新开始</button>
+        </div>
+      </section>
+
+      <aside class="tips" aria-label="操作说明">
+        <h2>操作说明</h2>
+        <ul>
+          <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 控制方向</li>
+          <li><kbd>Space</kbd> 开始或暂停</li>
+          <li><kbd>R</kbd> 重新开始</li>
+          <li>连续得分会逐步加速，撞墙或撞到自己则游戏结束</li>
+        </ul>
+      </aside>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
