@@ -4,6 +4,7 @@ const ctx = canvas.getContext("2d");
 const scoreEl = document.querySelector("#score");
 const bestScoreEl = document.querySelector("#best-score");
 const speedEl = document.querySelector("#speed");
+const statusEl = document.querySelector("#game-status");
 const overlay = document.querySelector("#overlay");
 const overlayTitle = document.querySelector("#overlay-title");
 const overlayMessage = document.querySelector("#overlay-message");
@@ -25,6 +26,7 @@ let score;
 let tickMs;
 let lastFrameTime;
 let gameState;
+let particles;
 let bestScore = Number(localStorage.getItem(bestScoreKey)) || 0;
 
 const directions = {
@@ -50,8 +52,10 @@ function resetGame() {
   tickMs = baseTickMs;
   lastFrameTime = 0;
   gameState = "ready";
+  particles = [];
   food = createFood();
   updateStats();
+  setStatus("等待启动");
   showOverlay("准备开始", "按空格键或点击“开始游戏”进入霓虹赛道。");
   draw();
 }
@@ -66,6 +70,7 @@ function startGame() {
   }
 
   gameState = "playing";
+  setStatus("能量赛道运行中");
   hideOverlay();
   lastFrameTime = performance.now();
   requestAnimationFrame(gameLoop);
@@ -77,6 +82,7 @@ function pauseGame() {
   }
 
   gameState = "paused";
+  setStatus("游戏已暂停");
   showOverlay("已暂停", "按空格键或点击“开始游戏”继续挑战。");
 }
 
@@ -92,6 +98,7 @@ function gameLoop(timestamp) {
 
   if (timestamp - lastFrameTime >= tickMs) {
     update();
+    updateParticles();
     draw();
     lastFrameTime = timestamp;
   }
@@ -118,6 +125,7 @@ function update() {
   if (willEat) {
     score += 10;
     tickMs = Math.max(minTickMs, baseTickMs - Math.floor(score / 50) * 7);
+    burstParticles(food);
     food = createFood();
     updateStats();
   } else {
@@ -128,12 +136,25 @@ function update() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
+  drawParticles();
   drawFood();
   drawSnake();
 }
 
 function drawGrid() {
-  ctx.fillStyle = "#07172a";
+  const boardGradient = ctx.createRadialGradient(
+    canvas.width / 2,
+    canvas.height / 2,
+    20,
+    canvas.width / 2,
+    canvas.height / 2,
+    canvas.width / 1.05,
+  );
+  boardGradient.addColorStop(0, "#10284a");
+  boardGradient.addColorStop(0.64, "#07172a");
+  boardGradient.addColorStop(1, "#040b17");
+
+  ctx.fillStyle = boardGradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.strokeStyle = "rgba(255, 255, 255, 0.035)";
@@ -149,6 +170,10 @@ function drawGrid() {
     ctx.lineTo(canvas.width, position);
     ctx.stroke();
   }
+
+  ctx.strokeStyle = "rgba(49, 232, 255, 0.12)";
+  ctx.lineWidth = 5;
+  ctx.strokeRect(2.5, 2.5, canvas.width - 5, canvas.height - 5);
 }
 
 function drawSnake() {
@@ -167,6 +192,10 @@ function drawSnake() {
     ctx.fillStyle = gradient;
     roundRect(x, y, size, size, 8);
     ctx.fill();
+
+    if (index === 0) {
+      drawSnakeEyes(segment);
+    }
   });
   ctx.shadowBlur = 0;
 }
@@ -174,7 +203,8 @@ function drawSnake() {
 function drawFood() {
   const centerX = food.x * tileSize + tileSize / 2;
   const centerY = food.y * tileSize + tileSize / 2;
-  const radius = tileSize * 0.36;
+  const pulse = Math.sin(performance.now() / 150) * 0.08;
+  const radius = tileSize * (0.36 + pulse);
   const gradient = ctx.createRadialGradient(centerX, centerY, 2, centerX, centerY, radius);
 
   gradient.addColorStop(0, "#fff7bd");
@@ -187,6 +217,78 @@ function drawFood() {
   ctx.beginPath();
   ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.58)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius + 5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawSnakeEyes(head) {
+  const centerX = head.x * tileSize + tileSize / 2;
+  const centerY = head.y * tileSize + tileSize / 2;
+  const eyeOffsetX = direction.y !== 0 ? 6 : 0;
+  const eyeOffsetY = direction.x !== 0 ? 6 : 0;
+  const forwardX = direction.x * 5;
+  const forwardY = direction.y * 5;
+
+  ctx.fillStyle = "#06111f";
+  ctx.shadowBlur = 0;
+  [
+    { x: centerX + eyeOffsetX + forwardX, y: centerY + eyeOffsetY + forwardY },
+    { x: centerX - eyeOffsetX + forwardX, y: centerY - eyeOffsetY + forwardY },
+  ].forEach((eye) => {
+    ctx.beginPath();
+    ctx.arc(eye.x, eye.y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function burstParticles(origin) {
+  const centerX = origin.x * tileSize + tileSize / 2;
+  const centerY = origin.y * tileSize + tileSize / 2;
+
+  for (let i = 0; i < 24; i += 1) {
+    const angle = (Math.PI * 2 * i) / 24;
+    const speed = 2.2 + Math.random() * 2.8;
+    particles.push({
+      x: centerX,
+      y: centerY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 28 + Math.random() * 16,
+      color: i % 2 === 0 ? "#ffcf5a" : "#ff5bd1",
+    });
+  }
+}
+
+function updateParticles() {
+  particles = particles
+    .map((particle) => ({
+      ...particle,
+      x: particle.x + particle.vx,
+      y: particle.y + particle.vy,
+      vx: particle.vx * 0.94,
+      vy: particle.vy * 0.94,
+      life: particle.life - 1,
+    }))
+    .filter((particle) => particle.life > 0);
+}
+
+function drawParticles() {
+  particles.forEach((particle) => {
+    const alpha = Math.max(0, particle.life / 42);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = particle.color;
+    ctx.shadowColor = particle.color;
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
   ctx.shadowBlur = 0;
 }
 
@@ -227,6 +329,7 @@ function endGame() {
     localStorage.setItem(bestScoreKey, String(bestScore));
   }
   updateStats();
+  setStatus("赛道熄火，准备重启");
   draw();
   showOverlay("游戏结束", `本局得分 ${score}，按 R 或点击“重新开始”再来一局。`);
 }
@@ -235,6 +338,10 @@ function updateStats() {
   scoreEl.textContent = score;
   bestScoreEl.textContent = bestScore;
   speedEl.textContent = `${(baseTickMs / tickMs).toFixed(1)}x`;
+}
+
+function setStatus(text) {
+  statusEl.textContent = text;
 }
 
 function showOverlay(title, message) {

@@ -7,11 +7,22 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
+    <div class="scene-glow" aria-hidden="true">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
     <main class="game-shell">
       <section class="hero">
         <p class="eyebrow">Desktop Arcade</p>
         <h1>霓虹贪吃蛇</h1>
         <p class="intro">用方向键或 WASD 操控小蛇，吃掉能量果实，挑战更高分。</p>
+        <div class="hero-badges" aria-label="游戏特色">
+          <span>霓虹赛道</span>
+          <span>动态加速</span>
+          <span>本地最高分</span>
+        </div>
       </section>
 
       <section class="game-card" aria-label="贪吃蛇游戏">
@@ -29,6 +40,8 @@
             <strong id="speed">1x</strong>
           </div>
         </div>
+
+        <div class="game-status" id="game-status">等待启动</div>
 
         <div class="board-wrap">
           <canvas id="game-board" width="600" height="600" aria-label="贪吃蛇游戏区域"></canvas>
@@ -53,6 +66,10 @@
           <li><kbd>R</kbd> 重新开始</li>
           <li>连续得分会逐步加速，撞墙或撞到自己则游戏结束</li>
         </ul>
+        <div class="mini-panel">
+          <span>目标</span>
+          <strong>吃掉更多能量果实，点亮整条赛道。</strong>
+        </div>
       </aside>
     </main>
 
